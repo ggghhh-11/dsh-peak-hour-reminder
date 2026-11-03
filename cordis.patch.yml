@@ -1,0 +1,8 @@
+# dsh-peak-hour-reminder bundle patch: inserts the host row into the profile's
+# plugin roster. Install by adding this package to the profile's
+# dsh.profile.bundles (or through the in-app plugin manager). Do NOT also add a
+# manual `insert` for the same id to the profile patch: duplicate ids crash the
+# loader.
+- insert:
+    - id: dsh-peak-hour-reminder
+      name: 'dsh-peak-hour-reminder'
