@@ -1,0 +1,10 @@
+node_modules/
+*.bak
+*.bak-*
+*.log
+holidays.json
+.acl-recovery/
+.DS_Store
+Thumbs.db
+github-token.txt
+.credentials.yaml
