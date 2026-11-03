@@ -1,0 +1,46 @@
+{
+  "name": "dsh-peak-hour-reminder",
+  "version": "0.1.0",
+  "description": "DeepSeek API 高峰时段逐回合提醒、跨峰暂停询问，以及节假日数据自动更新。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node scripts/run-tests.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek-api",
+    "peak-hours",
+    "holidays"
+  ],
+  "author": "ggghhh-11",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ggghhh-11/dsh-peak-hour-reminder.git"
+  },
+  "homepage": "https://github.com/ggghhh-11/dsh-peak-hour-reminder#readme",
+  "bugs": {
+    "url": "https://github.com/ggghhh-11/dsh-peak-hour-reminder/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
