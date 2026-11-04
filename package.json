@@ -1,7 +1,7 @@
 {
   "name": "dsh-peak-hour-reminder",
-  "version": "0.1.0",
-  "description": "DeepSeek API 高峰时段逐回合提醒、跨峰暂停询问，以及节假日数据自动更新。",
+  "version": "0.1.1",
+  "description": "DeepSeek API 高峰时段开局询问、跨峰暂停、窗口内静默，以及节假日数据自动更新。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
