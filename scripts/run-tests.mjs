@@ -6,6 +6,7 @@
  */
 import '../test/peak.test.mjs'
 import '../test/pause.test.mjs'
+import '../test/state.test.mjs'
 import '../test/data.test.mjs'
 import '../test/update.test.mjs'
 import '../test/pre-step.test.mjs'
