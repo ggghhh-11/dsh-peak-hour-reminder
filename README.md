@@ -1,20 +1,21 @@
 # dsh-peak-hour-reminder
 
-DeepSeek Harness 的本地 host 插件：在模型调用高峰时段提醒你，跨入高峰时暂停并询问是否继续，并在节假日数据过期时自动更新、清理旧年份。
+DeepSeek Harness 的本地 host 插件：在模型调用高峰时段先暂停并询问是否继续；接受后当前高峰窗口内保持静默；跨入新高峰窗口再询问。另有节假日数据自动更新与清理。
 
 ## 它做什么
 
-1. **高峰提醒**
-   - 每个用户回合第一次调用模型前判断北京时间。
-   - 只有高峰时才插入一条可见的 `⏰ 高峰时段提醒`；空闲时段完全静默。
-   - 提醒包含当前时间、星期、所在窗口、距空闲还有多久；高峰期单价约为空闲的 2 倍。
+1. **高峰开局询问**
+   - 用户在高峰时段发来消息时，在模型回答前弹出询问卡：
+     - 「继续」：放行本回合；本高峰窗口内不再询问，也不再发高峰提醒；
+     - 「暂停」：结束本轮，但保留你刚发的消息；之后发送「继续」即可恢复，恢复时不再重复询问。
+   - 询问卡包含当前窗口、距空闲还有多久。
 
 2. **跨峰暂停**
    - 回合在空闲时段开始、执行中进入高峰时，在**下一个安全步骤边界**弹出询问卡：
-     - 「继续」：继续执行后续步骤，并写入一条“用户选择继续”的 notice；
+     - 「继续」：继续执行后续步骤，本高峰窗口内不再询问；
      - 「暂停」：结束本轮后续步骤，写入一条持久暂停 notice；已完成的消息、工具调用、工具结果都已保存，之后发送「继续」即可恢复。
    - 不会硬中断正在流式生成的回复或正在执行的工具，避免丢失半截输出/未完成工具结果。
-   - 同一条消息触发的同一回合、同一个高峰窗口只问一次；跨到下一个高峰窗口会再问。
+   - 同一个高峰窗口只问一次；跨到下一个高峰窗口（例如 12:00 空闲后 14:00 再高峰）会再问。
 
 3. **节假日数据自动更新**
    - 数据文件记录 `coverageThrough`（已完整覆盖到哪一年）。
@@ -78,6 +79,8 @@ DSH Desktop 的 `desktop` profile 由应用独占管理，CLI 的 `dsh plugin --
       - { start: '14:00', end: '18:00' }
     weekendOffPeak: true
     pauseOnPeakCrossing: true
+    askOnPeakStart: true
+    quietAfterContinue: true
     showPriceHint: true
     updateEnabled: true
     updateUrls:
@@ -93,6 +96,9 @@ DSH Desktop 的 `desktop` profile 由应用独占管理，CLI 的 `dsh plugin --
 - `weekendOffPeak`：周末全天空闲，默认 `true`。
 - `extraHolidays`：额外假日 `YYYY-MM-DD` 数组（补官方尚未发布的假期、公司假日）。
 - `pauseOnPeakCrossing`：跨峰暂停询问，默认 `true`。
+- `askOnPeakStart`：高峰开局立即询问，默认 `true`。
+- `quietAfterContinue`：用户选择继续后，本高峰窗口内不再发提醒，默认 `true`；设为 `false` 可保留每回合 notice。
+- `showPriceHint`：是否在高峰提醒里附价格提示，默认 `true`。
 - `updateEnabled`：是否联网更新节假日，默认 `true`；关闭后完全离线。
 - `updateUrls`：节假日 JSON 模板，必须包含 `{year}`；默认 timor.tech。
 - `dataDir`：数据目录，默认 `$DSH_HOME/peak-hour-reminder`（通常是 `%USERPROFILE%\.dsh\peak-hour-reminder`）；一般不需要改。
@@ -134,6 +140,25 @@ DSH Desktop 的 `desktop` profile 由应用独占管理，CLI 的 `dsh plugin --
 
 只取 `holiday: true` 的日期；`holiday: false` 的补班日不影响峰谷定价（周末仍然空闲）。
 
+## 高峰窗口状态文件
+
+默认位置：`%USERPROFILE%\.dsh\peak-hour-reminder\state.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "acceptedWindowKey": "2026-11-04:14:00-18:00",
+  "acceptedAt": "2026-11-04T07:46:00.000Z",
+  "pausedWindowKey": null,
+  "pausedAt": null
+}
+```
+
+- `acceptedWindowKey`：用户已选择继续的窗口；该窗口内不再询问、不再发 notice（`quietAfterContinue: true` 时）。
+- `pausedWindowKey`：用户选择暂停、等待「继续」恢复的窗口。
+- 全局生效（同一 DSH 实例的所有会话）；DSH 重启后仍保持，直到窗口结束/进入下一个高峰窗口。
+- 删除该文件可强制下一次高峰重新询问。
+
 ## 测试
 
 ```powershell
@@ -150,7 +175,7 @@ node scripts/net-check.mjs
 
 期望输出 2026 年 `status: "complete"`、`holidays: 33`；若网络不可达会打印错误并保留旧数据。
 
-## 验证跨峰暂停
+## 验证高峰询问
 
 当前时间若不是高峰，可用临时配置强制一个覆盖当前时间的窗口：
 
@@ -159,19 +184,26 @@ node scripts/net-check.mjs
   config:
     peakWindows:
       - { start: '00:00', end: '23:59' }
+```
+
+发送一条新消息，应在模型回答前弹出“继续/暂停”询问卡。验证完请删除该配置并恢复默认窗口；如需重新测试，可删除 `state.json`。
+
+验证跨峰询问（step 2）时再加：
+
+```yaml
     debugForcePause: true
 ```
 
-`debugForcePause` 会强制把回合视为“从空闲开始”，从而在第 2 步触发暂停询问；验证完请删除该项并恢复默认窗口。
+`debugForcePause` 会强制把回合视为“从空闲开始”，从而在第 2 步触发跨峰询问。
 
 ## 已知限制
 
-- 暂停只发生在 pre-step 边界：进行中的流式生成或工具调用会先完成。不会硬中断，以免丢失半截输出/未完成工具结果。
-- 不在 step 1 暂停：reject 会丢弃 claimed 用户输入；如果用户在 08:59 发消息、09:00 才进入 pre-step，该回合按“高峰开始”处理（提醒并继续）。
-- 单步回合（普通问答、无工具调用）没有后续步骤可暂停，工作已完成。
-- subagent 不提醒、不暂停；子代理已在执行的工作允许完成，主回合在下一个边界暂停。
+- 高峰开局询问发生在 step 1，模型尚未调用；选择暂停时会把刚发的用户消息写入 session 后再结束本轮，确保消息不丢。若写入失败，会回退为 notice + 继续本回合，避免吞消息。
+- 跨峰暂停只发生在 pre-step 边界：进行中的流式生成或工具调用会先完成。不会硬中断，以免丢失半截输出/未完成工具结果。
+- 跨峰询问只对多步回合有意义；普通单步回答在空闲开始、跨入高峰前已经结束。
+- subagent 不询问；子代理已在执行的工作允许完成，主回合在下一个边界暂停。
 - 2027 年除元旦外的假期需等官方通知；在数据更新前会按工作日规则判断，并在提醒中注明。
-- 若宿主没有 user-questions answerer（如无 Web UI 的 headless 环境），跨峰询问会降级为“暂停 + 持久 notice”。
+- 若宿主没有 user-questions answerer（如无 Web UI 的 headless 环境）：高峰开局会回退为 notice + 继续；跨峰会降级为“暂停 + 持久 notice”。
 
 ## 卸载
 
