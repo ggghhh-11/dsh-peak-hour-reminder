@@ -3,6 +3,7 @@ node_modules/
 *.bak-*
 *.log
 holidays.json
+state.json
 .acl-recovery/
 .DS_Store
 Thumbs.db
